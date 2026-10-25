@@ -1,0 +1,55 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/invoice}
+    username: ${DB_USERNAME:invoice}
+    password: ${DB_PASSWORD:invoice}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  mail:
+    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${MAIL_PORT:2525}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:super-secret-dev-key-change-in-production-must-be-long-enough-256bit}
+    access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:15}
+    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  resend:
+    api-key: ${RESEND_API_KEY:}
+    from: ${RESEND_FROM:InvoiceApp <noreply@yourdomain.com>}
+  storage:
+    path: ${STORAGE_PATH:storage/invoices}
+  overdue:
+    cron: "0 0 1 * * *"   # daily at 1 AM
+  worker:
+    enabled: ${WORKER_ENABLED:true}
+    poll-interval-ms: ${WORKER_POLL_INTERVAL_MS:2000}
+    stuck-job-timeout-minutes: ${WORKER_STUCK_TIMEOUT_MINUTES:5}
+  reminder:
+    poll-interval-seconds: ${REMINDER_POLL_SECONDS:60}
+
+logging:
+  level:
+    com.invoice: DEBUG

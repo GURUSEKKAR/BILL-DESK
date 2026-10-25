@@ -1,0 +1,217 @@
+### Register a new business
+POST http://localhost:8080/auth/register
+Content-Type: application/json
+
+{
+  "email": "owner@mybiz.com",
+  "password": "password123",
+  "businessName": "My Business"
+}
+
+### Login
+# @name login
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@mybiz.com",
+  "password": "password123"
+}
+
+### Refresh token
+POST http://localhost:8080/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.refreshToken}}"
+}
+
+### Create customer
+# @name customer
+POST http://localhost:8080/customers
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Acme Corp",
+  "email": "billing@acme.com",
+  "phone": "+1-555-0100"
+}
+
+### List customers
+GET http://localhost:8080/customers?size=10
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Get customer
+GET http://localhost:8080/customers/{{customer.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Create invoice
+# @name invoice
+POST http://localhost:8080/invoices
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "customerId": "{{customer.response.body.id}}",
+  "dueDate": "2026-12-31",
+  "items": [
+    { "description": "Consulting hours", "qty": 10, "unitPricePaise": 50000 },
+    { "description": "Travel", "qty": 2, "unitPricePaise": 15000 }
+  ]
+}
+
+### Get invoice
+GET http://localhost:8080/invoices/{{invoice.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### List invoices with cursor pagination
+GET http://localhost:8080/invoices?status=SENT&limit=10
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Send invoice (DRAFT -> SENT)
+POST http://localhost:8080/invoices/{{invoice.response.body.id}}/send
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Cancel invoice
+POST http://localhost:8080/invoices/{{invoice.response.body.id}}/cancel
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Mark as paid (with idempotency key)
+POST http://localhost:8080/invoices/{{invoice.response.body.id}}/payments
+Authorization: Bearer {{login.response.body.accessToken}}
+Idempotency-Key: pay-001
+Content-Type: application/json
+
+{
+  "amountPaise": 530000,
+  "method": "BANK_TRANSFER"
+}
+
+### Dashboard summary
+GET http://localhost:8080/dashboard/summary
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Run overdue job (admin)
+POST http://localhost:8080/admin/run-overdue
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### ──────────────────────────────────────────────────────────────
+### Phase 3 — multi-counter hierarchy
+### ──────────────────────────────────────────────────────────────
+
+### List counters (OWNER). Every business starts with a default "Main" (C1).
+# @name counters
+GET http://localhost:8080/counters
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Create a counter (OWNER)
+# @name newCounter
+POST http://localhost:8080/counters
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Front Desk",
+  "code": "C2"
+}
+
+### Update a counter (OWNER) — rename / deactivate
+PATCH http://localhost:8080/counters/{{newCounter.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Front Desk (renamed)",
+  "active": true
+}
+
+### Create a cashier pinned to a counter (OWNER)
+# @name newCashier
+POST http://localhost:8080/users
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "email": "cashier@mybiz.com",
+  "password": "password123",
+  "counterId": "{{newCounter.response.body.id}}"
+}
+
+### List users (OWNER)
+GET http://localhost:8080/users
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Reassign / deactivate a cashier (OWNER)
+PATCH http://localhost:8080/users/{{newCashier.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "counterId": "{{counters.response.body.0.id}}",
+  "active": true
+}
+
+### Cashier login
+# @name cashierLogin
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "cashier@mybiz.com",
+  "password": "password123"
+}
+
+### Create an invoice as OWNER — counterId REQUIRED
+POST http://localhost:8080/invoices
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "customerId": "{{customer.response.body.id}}",
+  "counterId": "{{newCounter.response.body.id}}",
+  "dueDate": "2026-12-31",
+  "items": [{ "description": "Consulting", "qty": 1, "unitPricePaise": 500000 }]
+}
+
+### Create an invoice as CASHIER — counterId taken from their assignment (ignored if sent)
+POST http://localhost:8080/invoices
+Authorization: Bearer {{cashierLogin.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "customerId": "{{customer.response.body.id}}",
+  "dueDate": "2026-12-31",
+  "items": [{ "description": "Repair", "qty": 1, "unitPricePaise": 150000 }]
+}
+
+### Owner dashboard — business-wide, or filter by a counter
+GET http://localhost:8080/dashboard/summary
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Owner dashboard filtered to a counter
+GET http://localhost:8080/dashboard/summary?counterId={{newCounter.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Owner per-counter breakdown (OWNER only)
+GET http://localhost:8080/dashboard/by-counter
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Cashier dashboard — always their own counter (counterId param ignored)
+GET http://localhost:8080/dashboard/summary
+Authorization: Bearer {{cashierLogin.response.body.accessToken}}
+
+### Customer balance — business-wide total + credit status, no invoice details (both roles)
+GET http://localhost:8080/customers/{{customer.response.body.id}}/balance
+Authorization: Bearer {{cashierLogin.response.body.accessToken}}
+
+### Create a customer with a credit limit (Phase 3b)
+POST http://localhost:8080/customers
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Credit Co",
+  "email": "ap@creditco.com",
+  "creditLimitPaise": 1000000
+}
